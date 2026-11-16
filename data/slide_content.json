@@ -1,0 +1,708 @@
+[
+  {
+    "section": "CAPSTONE PROJECT",
+    "title": "Predicting Falcon 9\nfirst-stage landing outcomes",
+    "bullets": [
+      "A reproducible data-science study of historical SpaceX launches",
+      "Collection \u2022 Wrangling \u2022 SQL \u2022 Visual analytics \u2022 Machine learning",
+      "Presenter: Hrant Ohannes Kasparian"
+    ],
+    "chart": null,
+    "table": null,
+    "subtitle": "DATA SCIENCE  /  HISTORICAL COHORTS 2010\u20132020",
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "01 / EXECUTIVE SUMMARY",
+    "title": "Strong signals; limited evidence for deployment",
+    "bullets": [
+      "90-launch modeling cohort: 60 successful landings (66.7%).",
+      "Methods: archived API data, Pandas cleaning, SQLite, six EDA plots, Folium, Dash and four tuned classifiers.",
+      "All four models score 15/18 = 83.3% test accuracy; the tree leads 10-fold CV at 87.7%.",
+      "Critical risks: only 18 test launches, false-positive landings and possible time/booster leakage.",
+      "Wikipedia retrieval is blocked; scraping code is supplied, not a fabricated scraped result."
+    ],
+    "chart": null,
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "02 / INTRODUCTION",
+    "title": "Business question: can a first stage be recovered?",
+    "bullets": [
+      "Objective: predict the course-defined binary landing class from launch and booster attributes.",
+      "Why it matters: recovery can support reuse planning; this study does not estimate actual launch costs or savings.",
+      "Success is a first-stage outcome, not payload-delivery mission success.",
+      "Decision framing: avoid overconfidence when predicting a successful landing.",
+      "Scope: historical educational snapshots, not current SpaceX performance."
+    ],
+    "chart": null,
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "03 / DATA CONTRACT",
+    "title": "Three cohorts\u2014not one interchangeable dataset",
+    "bullets": [
+      "Labels and launch-site spellings differ across cohorts. Never mix their denominators."
+    ],
+    "chart": null,
+    "table": [
+      [
+        "Cohort",
+        "Rows",
+        "Purpose / dates"
+      ],
+      [
+        "API-derived model data",
+        "90",
+        "Wrangling, EDA, ML / 2010-06-04\u20132020-11-05"
+      ],
+      [
+        "SQL source",
+        "101",
+        "Launch history queries / 2010-06-04\u20132020-12-06"
+      ],
+      [
+        "Dash + Folium",
+        "56 each",
+        "Interactive visual analytics / older launch subset"
+      ],
+      [
+        "Archived raw API",
+        "107",
+        "Collection audit / latest record 2020-11-16"
+      ]
+    ],
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "04 / COLLECTION \u2014 API",
+    "title": "Archived API response \u2192 enriched launch table",
+    "bullets": [
+      "GET /v4/launches/past \u2192 parse JSON \u2192 filter Falcon 9.",
+      "Resolve rocket, launchpad, payload and core IDs through their v4 endpoints.",
+      "Select single-payload/single-core launches; apply the lab cutoff; flatten launch metadata.",
+      "Archived response: 107 launches, including 99 Falcon 9, 5 Falcon 1 and 3 Falcon Heavy.",
+      "Live endpoint returned HTTP 522 here; modeling uses the frozen course CSVs, not a claimed live rebuild."
+    ],
+    "chart": null,
+    "table": null,
+    "subtitle": null,
+    "source": "Source: course API_call_spacex_api.json; API schema: github.com/r-spacex/SpaceX-API. GitHub: github.com/hrantk28-stack/SpaceX-Falcon9-Capstone"
+  },
+  {
+    "section": "05 / COLLECTION \u2014 WEB",
+    "title": "Request \u2192 inspect \u2192 parse \u2192 normalize \u2192 validate",
+    "bullets": [
+      "Task 1: request the June 9, 2021 Wikipedia revision (oldid 1027686922), check status and create BeautifulSoup.",
+      "Task 2: find launch tables and clean <th> names; remove footnotes and normalize whitespace.",
+      "Task 3: parse numbered launch rows; handle rowspans; build a DataFrame and export CSV.",
+      "Expected fields: flight, date/time, booster, site, payload, mass, orbit, customer and both outcomes.",
+      "Verified limit: HTTP 403 prevented extraction. No scraped row count is asserted."
+    ],
+    "chart": null,
+    "table": null,
+    "subtitle": null,
+    "source": "Source: attached web-scraping notebook; collection.py provides all three task solutions. GitHub: github.com/hrantk28-stack/SpaceX-Falcon9-Capstone"
+  },
+  {
+    "section": "06 / WRANGLING",
+    "title": "Define the target before interpreting \u201csuccess\u201d",
+    "bullets": [
+      "Inspect shape, dtypes, missingness and categorical values before transforming.",
+      "Class 0: False Ocean, False RTLS, False ASDS, None ASDS and None None.",
+      "Class 1: True ASDS, True RTLS and True Ocean \u2192 60/90 successes.",
+      "True Ocean (5 records) counts as class 1 in the lab but does not prove recoverability or reuse.",
+      "26/90 LandingPad values are missing (28.9%); missing pad dummies are all zero. Payload is already imputed in the course CSV."
+    ],
+    "chart": null,
+    "table": null,
+    "subtitle": null,
+    "source": "Source: dataset_part_1.csv and dataset_part_2.csv; analyze.py. GitHub: github.com/hrantk28-stack/SpaceX-Falcon9-Capstone"
+  },
+  {
+    "section": "07 / WRANGLING RESULTS",
+    "title": "Counts expose sample imbalance",
+    "bullets": [
+      "Outcome counts: True ASDS 41; None None 19; True RTLS 14; False ASDS 6; True Ocean 5; False Ocean 2; None ASDS 2; False RTLS 1.",
+      "Wrangling Task 2 excludes GTO as instructed: 63 launches remain. EDA/ML retain the full 90-launch cohort."
+    ],
+    "chart": null,
+    "table": [
+      [
+        "Launch site",
+        "Launches",
+        "Successful",
+        "Rate"
+      ],
+      [
+        "CCAFS SLC 40",
+        "55",
+        "33",
+        "60.0%"
+      ],
+      [
+        "KSC LC 39A",
+        "22",
+        "17",
+        "77.3%"
+      ],
+      [
+        "VAFB SLC 4E",
+        "13",
+        "10",
+        "76.9%"
+      ]
+    ],
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "08 / ORBIT COUNTS",
+    "title": "Orbit frequency is not orbit success rate",
+    "bullets": [
+      "*GTO is shown for cohort reconciliation; omit it for the wrangling task\u2019s requested non-GTO count."
+    ],
+    "chart": null,
+    "table": [
+      [
+        "Orbit",
+        "Count",
+        "Orbit",
+        "Count"
+      ],
+      [
+        "GTO*",
+        "27",
+        "ISS",
+        "21"
+      ],
+      [
+        "VLEO",
+        "14",
+        "PO",
+        "9"
+      ],
+      [
+        "LEO",
+        "7",
+        "SSO",
+        "5"
+      ],
+      [
+        "MEO",
+        "3",
+        "ES-L1",
+        "1"
+      ],
+      [
+        "GEO",
+        "1",
+        "HEO",
+        "1"
+      ],
+      [
+        "SO",
+        "1",
+        "TOTAL",
+        "90"
+      ]
+    ],
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "09 / EDA METHODOLOGY",
+    "title": "Six views answer six different questions",
+    "bullets": [
+      "Flight number \u00d7 site: inspect experience and site mix.",
+      "Payload \u00d7 site: compare payload operating ranges.",
+      "Orbit bars: compare average class, with sample-size labels.",
+      "Flight number \u00d7 orbit and payload \u00d7 orbit: reveal mixed mission contexts.",
+      "Yearly line: summarize changing performance; use year-specific denominators.",
+      "Association only: experience, vehicle generation, payload and site are confounded."
+    ],
+    "chart": null,
+    "table": null,
+    "subtitle": null,
+    "source": "Source: dataset_part_2.csv; analyze.py and completed_answers.ipynb. GitHub: github.com/hrantk28-stack/SpaceX-Falcon9-Capstone"
+  },
+  {
+    "section": "10 / EDA \u2014 TASK 1",
+    "title": "Later flights show more successful outcomes",
+    "bullets": [
+      "CCAFS dominates the cohort (55/90) and includes the earliest unsuccessful landings.",
+      "KSC begins later in the sequence, making site and experience difficult to separate.",
+      "KSC: 17/22 successes; VAFB: 10/13. Their similar rates have different sample sizes."
+    ],
+    "chart": "flight_site",
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "11 / EDA \u2014 TASK 2",
+    "title": "Payload envelopes vary by launch site",
+    "bullets": [
+      "VAFB maximum observed payload: 9,600 kg\u2014no launches above 10,000 kg in this cohort.",
+      "CCAFS and KSC each reach 15,600 kg.",
+      "Some masses are course-imputed; do not interpret every plotted value as a measured payload."
+    ],
+    "chart": "payload_site",
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "12 / EDA \u2014 TASK 3",
+    "title": "Perfect rates are often small-sample artifacts",
+    "bullets": [
+      "SSO: 5/5 = 100%. ES-L1, GEO and HEO each have only one successful observation.",
+      "VLEO: 12/14 = 85.7%; GTO: 14/27 = 51.9%.",
+      "SO: 0/1. Neither 0% nor 100% from one launch is a robust forecast."
+    ],
+    "chart": "orbit_success",
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "13 / EDA \u2014 TASK 4",
+    "title": "Flight sequence and orbit context interact",
+    "bullets": [
+      "LEO transitions from early class 0 observations toward later successes.",
+      "GTO contains both classes across the flight sequence; it is not cleanly separable.",
+      "FlightNumber is also a time proxy\u2014not a causal measure of learning."
+    ],
+    "chart": "flight_orbit",
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "14 / EDA \u2014 TASK 5",
+    "title": "Payload alone does not separate landing classes",
+    "bullets": [
+      "GTO successes and failures overlap strongly in payload mass.",
+      "VLEO launches carry 13,620\u201315,600 kg and achieve 12/14 successes.",
+      "Mission energy, booster generation and landing plan matter; mass alone is insufficient."
+    ],
+    "chart": "payload_orbit",
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "15 / EDA \u2014 TASK 6",
+    "title": "The annual trend improves\u2014but not monotonically",
+    "bullets": [
+      "2013: 0/3; 2017: 15/18 = 83.3%.",
+      "2018 falls to 11/18 = 61.1%; 2019 reaches 9/10 = 90.0%.",
+      "2020: 16/19 = 84.2%. The template\u2019s \u201ckept increasing\u201d claim is contradicted by the data.",
+      "No 2011 observations; do not interpolate a measured rate."
+    ],
+    "chart": "yearly",
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "16 / FEATURE ENGINEERING",
+    "title": "90 observations \u2192 83 numeric predictors",
+    "bullets": [
+      "Tasks 7\u20138: one-hot encode Orbit, LaunchSite, LandingPad, Serial, GridFins, Reused and Legs.",
+      "Retain FlightNumber, PayloadMass, Flights, Block and ReusedCount.",
+      "Cast every feature to float64; rebuilt values match the provided 90 \u00d7 83 model matrix.",
+      "Exclude Class and Outcome from predictors. Serial identifiers and repeated boosters still create leakage risks.",
+      "For production: audit when Flights/ReusedCount were measured; remove any post-launch information."
+    ],
+    "chart": null,
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "17 / SQL METHODOLOGY",
+    "title": "SQLite audit: ten queries, one explicit contract",
+    "bullets": [
+      "Load the 101-row CSV into SPACEXTBL and trim string whitespace.",
+      "Use DISTINCT, LIKE, SUM/AVG/MIN/MAX, GROUP BY, a subquery and date filtering.",
+      "Task 4 interprets \u201cF9 v1.1\u201d as a version family: LIKE 'F9 v1.1%'.",
+      "Task 7 groups all Success-prefixed mission labels; landing outcome is a different field.",
+      "Complete SQL and row-level outputs are included in the detailed report."
+    ],
+    "chart": null,
+    "table": null,
+    "subtitle": null,
+    "source": "Source: Spacex.csv; sql_answers.sql. GitHub: github.com/hrantk28-stack/SpaceX-Falcon9-Capstone"
+  },
+  {
+    "section": "18 / SQL \u2014 TASKS 1\u20135",
+    "title": "Launch sites, payload totals and first ground landing",
+    "bullets": [
+      "Task 2 uses ORDER BY Date for reproducibility. Full five records appear in the report."
+    ],
+    "chart": null,
+    "table": [
+      [
+        "Task",
+        "Verified answer"
+      ],
+      [
+        "1 / Unique sites",
+        "CCAFS LC-40; CCAFS SLC-40; KSC LC-39A; VAFB SLC-4E"
+      ],
+      [
+        "2 / First 5 CCA% dates",
+        "2010-06-04; 2010-12-08; 2012-05-22; 2012-10-08; 2013-03-01"
+      ],
+      [
+        "3 / NASA (CRS) payload",
+        "45,596 kg"
+      ],
+      [
+        "4 / F9 v1.1 family average",
+        "2,534.67 kg"
+      ],
+      [
+        "5 / First ground-pad success",
+        "2015-12-22"
+      ]
+    ],
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "19 / SQL \u2014 TASKS 6\u20139",
+    "title": "Do not confuse mission success with landing success",
+    "bullets": [
+      "Task 6: drone-ship successes, 4,000 < mass < 6,000 kg: F9 FT B1022, B1026, B1021.2 and B1031.2.",
+      "Task 7: 100 mission successes and 1 in-flight failure; Success (payload status unclear) is included in success.",
+      "Task 8: maximum payload = 15,600 kg; 12 booster-version records match (all B5). Full list in appendix.",
+      "Task 9: January 2015\u2014F9 v1.1 B1012; April 2015\u2014F9 v1.1 B1015. Both drone-ship failures at CCAFS LC-40."
+    ],
+    "chart": null,
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "20 / SQL \u2014 TASK 10",
+    "title": "Early landing outcomes: \u201cno attempt\u201d is largest",
+    "bullets": [
+      "Inclusive interval: June 4, 2010 through March 20, 2017; 31 launches. Ties share rank."
+    ],
+    "chart": null,
+    "table": [
+      [
+        "Landing outcome",
+        "Count",
+        "Dense rank"
+      ],
+      [
+        "No attempt",
+        "10",
+        "1"
+      ],
+      [
+        "Failure (drone ship)",
+        "5",
+        "2"
+      ],
+      [
+        "Success (drone ship)",
+        "5",
+        "2"
+      ],
+      [
+        "Controlled (ocean)",
+        "3",
+        "3"
+      ],
+      [
+        "Success (ground pad)",
+        "3",
+        "3"
+      ],
+      [
+        "Failure (parachute)",
+        "2",
+        "4"
+      ],
+      [
+        "Uncontrolled (ocean)",
+        "2",
+        "4"
+      ],
+      [
+        "Precluded (drone ship)",
+        "1",
+        "5"
+      ]
+    ],
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "21 / INTERACTIVE VISUAL ANALYTICS",
+    "title": "Folium explains location; Dash explains filters",
+    "bullets": [
+      "Folium: site circles, red/green launch markers, marker clusters, MousePosition and distance lines.",
+      "Dash: searchable site dropdown, all-site success-share pie and selected-site outcome pie.",
+      "A 0\u201310,000 kg RangeSlider filters payload scatter; booster category is encoded by color.",
+      "PDF views are static screenshots. The source package contains the runnable interactive app and maps.",
+      "Dash/Folium use 56 records\u2014not the 90-row modeling cohort."
+    ],
+    "chart": null,
+    "table": null,
+    "subtitle": null,
+    "source": "Source: spacex_launch_geo.csv and spacex_launch_dash.csv. GitHub: github.com/hrantk28-stack/SpaceX-Falcon9-Capstone"
+  },
+  {
+    "section": "22 / FOLIUM \u2014 TASK 1",
+    "title": "Launch sites are coastal, not on the Equator",
+    "bullets": [
+      "The course locations span about 28.6\u00b0N to 34.6\u00b0N: none are equatorial.",
+      "Florida sites appear on the Atlantic side; VAFB is on the Pacific side.",
+      "Coastal geography is consistent with downrange ocean corridors; it does not establish site-selection causality.",
+      "Coordinates and site labels are used exactly as supplied, not independently surveyed."
+    ],
+    "chart": "launch_map",
+    "table": null,
+    "subtitle": null,
+    "source": "Source: course geo CSV; Folium screenshot; basemap \u00a9 OpenStreetMap contributors."
+  },
+  {
+    "section": "23 / FOLIUM \u2014 TASK 2",
+    "title": "Clustered launch records reveal site-level outcomes",
+    "bullets": [
+      "56 launch markers: green = class 1, red = class 0; coincident markers cluster.",
+      "KSC LC-39A: 10/13 successful; CCAFS LC-40: 7/26.",
+      "VAFB SLC-4E: 4/10; CCAFS SLC-40: 3/7.",
+      "CCAFS LC-40 and SLC-40 are retained as distinct course labels; they refer to the same named complex across eras."
+    ],
+    "chart": "launch_records",
+    "table": null,
+    "subtitle": null,
+    "source": "Source: geo CSV and launch_map.html; basemap \u00a9 OpenStreetMap contributors."
+  },
+  {
+    "section": "24 / FOLIUM \u2014 TASK 3",
+    "title": "Proximity analysis: calculated, not surveyed",
+    "bullets": [
+      "From course CCAFS LC-40 point: selected coastline point \u22480.58 km; Titusville reference center \u224823.16 km.",
+      "Illustrative road-corridor point \u22480.55 km; rail-corridor point \u22481.31 km. Feature identity is unverified.",
+      "Distances are haversine point-to-point, not road routes or validated nearest-feature distances.",
+      "Conclusion: coastal access and city separation are plausible; nearest railway/highway claims remain unverified."
+    ],
+    "chart": "proximity_map",
+    "table": null,
+    "subtitle": null,
+    "source": "Source: course coordinates + explicitly illustrative reference points; OpenStreetMap basemap. See report caveats."
+  },
+  {
+    "section": "25 / DASH \u2014 IMPLEMENTATION",
+    "title": "A working dashboard, not a mock-up",
+    "bullets": [
+      "All-site view counts only successful launches for the pie.",
+      "Selected-site view compares class 1 with class 0.",
+      "Payload range and site selection jointly filter the scatter.",
+      "Both callbacks were browser-tested; this is a screenshot of the running local app."
+    ],
+    "chart": "dashboard_all",
+    "table": null,
+    "subtitle": null,
+    "source": "Source: dashboard.py; screenshot of live local Dash application. GitHub: github.com/hrantk28-stack/SpaceX-Falcon9-Capstone"
+  },
+  {
+    "section": "26 / DASH \u2014 QUESTIONS 1\u20132",
+    "title": "KSC leads both success count and success rate",
+    "bullets": [
+      "Q1: KSC LC-39A has 10 successes\u2014the largest count.",
+      "Q2: KSC LC-39A also has the highest rate: 10/13 = 76.9%.",
+      "All-site pie: KSC contributes 10/24 = 41.7% of successes. This is not its site success rate."
+    ],
+    "chart": "dash_pies",
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "27 / DASH \u2014 QUESTIONS 3\u20134",
+    "title": "Payload-bin rankings depend on the definition",
+    "bullets": [
+      "Using fixed 1,000 kg bins, highest observed rate: (3,000, 4,000] kg, 8/11 = 72.7%.",
+      "Lowest nonempty bin: (6,000, 7,000] kg, 0/4 = 0%.",
+      "Exclude empty bins from ranking; (7,000, 9,000] kg has no observations.",
+      "Zero payload values may mean unknown mass. Binning is descriptive, not a recommended operating threshold."
+    ],
+    "chart": "payload_bins",
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "28 / DASH \u2014 QUESTION 5",
+    "title": "B5 wins on rate\u2014but has only one observation",
+    "bullets": [
+      "B5: 1/1 = 100%; FT: 16/24 = 66.7%; B4: 6/11 = 54.5%.",
+      "v1.1: 1/15 = 6.7%; v1.0: 0/5 = 0%.",
+      "FT is strongest among categories with at least five observations in this sample.",
+      "Later booster versions are confounded with calendar time, mission mix and landing capability."
+    ],
+    "chart": "dash_scatter",
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "29 / PREDICTIVE ANALYSIS",
+    "title": "One holdout, four tuned classifiers, two protocols",
+    "bullets": [
+      "Tasks 1\u20133: Y = Class.to_numpy(); 80/20 split, random_state=2 \u2192 72 train and 18 test.",
+      "Tasks 4\u201311: tune logistic regression, SVM, decision tree and KNN using 10-fold CV.",
+      "Course reproduction: standardize before split, as instructed. This leaks preprocessing information.",
+      "Preferred sensitivity run: StandardScaler inside a Pipeline, fitted separately within each CV fold.",
+      "Compatibility fix: deprecated tree max_features=auto is equivalent to sqrt for classification; set seed=2."
+    ],
+    "chart": null,
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "30 / MODEL RESULTS",
+    "title": "Decision tree leads CV; all models tie on the test",
+    "bullets": [
+      "Pipeline protocol. Every model: precision 0.800 and recall 1.000 for class 1.",
+      "Majority-class baseline on test: 12/18 = 66.7%. Model gain = 16.7 percentage points."
+    ],
+    "chart": null,
+    "table": [
+      [
+        "Model",
+        "10-fold CV",
+        "Test accuracy",
+        "F1 / class 1"
+      ],
+      [
+        "Logistic regression",
+        "84.6%",
+        "83.3%",
+        "0.889"
+      ],
+      [
+        "SVM",
+        "82.1%",
+        "83.3%",
+        "0.889"
+      ],
+      [
+        "Decision tree",
+        "87.7%",
+        "83.3%",
+        "0.889"
+      ],
+      [
+        "KNN",
+        "84.8%",
+        "83.3%",
+        "0.889"
+      ]
+    ],
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "31 / MODEL COMPARISON",
+    "title": "Rank using CV\u2014not a tied test score",
+    "bullets": [
+      "Decision tree CV = 87.7%; KNN = 84.8%; logistic regression = 84.6%; SVM = 82.1%.",
+      "Course reproduction CV: tree 87.7%, SVM 84.8%, KNN 84.8%, logistic regression 84.6%.",
+      "Moving scaling inside folds changes SVM tuning, not the 83.3% test result.",
+      "Select the tree as the provisional CV leader; do not claim proven test superiority."
+    ],
+    "chart": "model_comparison",
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "32 / CONFUSION MATRICES",
+    "title": "False positives are the unresolved operational risk",
+    "bullets": [
+      "Every model returns the same test matrix: TN=3, FP=3, FN=0, TP=12.",
+      "Three of six actual class 0 launches are predicted successful: false-positive rate = 50%.",
+      "Recall of successful landings is 100%, but failure-class recall is only 50%.",
+      "18 test records are too few for deployment assurance; one changed prediction moves accuracy by 5.6 points."
+    ],
+    "chart": "confusions",
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "33 / BEST MODEL",
+    "title": "Provisional choice: a constrained decision tree",
+    "bullets": [
+      "Best pipeline settings: criterion=gini, splitter=best, max_depth=8, max_features=sqrt.",
+      "min_samples_leaf=2, min_samples_split=10, random_state=2.",
+      "Highest CV score: 0.8768. Test score: 0.8333. A ranking, not proof of generalization.",
+      "Next validation: time-ordered holdout and booster-group separation; remove serial IDs and audit prelaunch availability.",
+      "Use calibrated probabilities and a false-positive-aware threshold before any operational decision."
+    ],
+    "chart": null,
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "34 / CONCLUSION",
+    "title": "Separate prediction, recoverability and business value",
+    "bullets": [
+      "Landing performance improves broadly over time, but annual setbacks and mission mix matter.",
+      "KSC leads observed site rates; small samples prevent causal or universal rankings.",
+      "Four classifiers beat a simple baseline, yet half of test failures are missed.",
+      "Creative extension: two-stage modeling\u2014first landing attempt/strategy, then success conditional on attempt.",
+      "A business case also needs recovery condition, turnaround time and refurbishment cost\u2014none are available here."
+    ],
+    "chart": null,
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "35 / DELIVERY CHECK",
+    "title": "Project deliverables and transparent limitations",
+    "bullets": [
+      "Completed: all computational lab answers, EDA figures, SQL results, dashboard callbacks, map markers and model evaluation.",
+      "Included: PDF slides, editable PowerPoint, detailed Q&A report, executable source, notebook and frozen datasets.",
+      "Blocked externally: historical Wikipedia extraction (HTTP 403); live API refresh (HTTP 522).",
+      "Proximity road/rail points are illustrative, not a validated nearest-feature analysis.",
+      "Project repository: github.com/hrantk28-stack/SpaceX-Falcon9-Capstone \u2014 presenter Hrant Ohannes Kasparian."
+    ],
+    "chart": null,
+    "table": null,
+    "subtitle": null,
+    "source": "IBM Skills Network course datasets; independently recomputed for this project."
+  },
+  {
+    "section": "36 / REFERENCES",
+    "title": "Source register and reproducibility",
+    "bullets": [
+      "Primary inputs: six attached notebooks, Dash lab instructions and grading-criteria image.",
+      "IBM datasets: dataset_part_1/2/3.csv; Spacex.csv; spacex_launch_dash.csv; spacex_launch_geo.csv; archived API JSON.",
+      "Dataset base: cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-DS0321EN-SkillsNetwork/",
+      "API schema: github.com/r-spacex/SpaceX-API; Wikipedia revision oldid=1027686922 (June 9, 2021).",
+      "Run order and package versions are documented in the source package. Analysis date: November 15, 2026."
+    ],
+    "chart": null,
+    "table": null,
+    "subtitle": null,
+    "source": "All numeric results are recomputed from the frozen course inputs; no current launch statistics are asserted."
+  }
+]
